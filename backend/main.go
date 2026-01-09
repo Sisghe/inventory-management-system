@@ -2,56 +2,81 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
-
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
+
+	"github.com/sisghe/inventory-management-system/backend/db"
 )
 
 func main() {
-	// Carica .env dalla root
+	// Carica variabili d'ambiente
 	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("No .env file found")
+		log.Println("No .env file found (continuo comunque usando env di sistema)")
 	}
 
-	// Stringa di connessione da .env
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_SSLMODE"),
-	)
-
-	// Connessione al DB
-	conn, err := pgx.Connect(context.Background(), dsn)
-	if err != nil {
+	// Connessione al database (pgxpool)
+	if err := db.Connect(); err != nil {
 		log.Fatal("Unable to connect to database:", err)
 	}
-	defer conn.Close(context.Background())
+	defer db.Pool.Close()
 
-	fmt.Println("Connected to database inventory_db successfully!")
+	// ✅ Verifica reale connessione DB con Ping (pgxpool)
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		if err := db.Pool.Ping(ctx); err != nil {
+			log.Fatal("❌ DB Ping failed:", err)
+		}
+	}
+
+	log.Println("✅ Connected to database successfully (pgxpool ping OK)!")
 
 	// Server Gin
 	r := gin.Default()
 
+	// Healthcheck base
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"message":   "pong",
-			"db_status": "connected",
+			"message": "pong",
+			"status":  "server up",
 		})
 	})
 
+	// Healthcheck DB (fa query vera)
+	r.GET("/db-ping", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		var one int
+		err := db.Pool.QueryRow(ctx, "SELECT 1").Scan(&one)
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"db":    "down",
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"db":     "up",
+			"select": one,
+		})
+	})
+
+	// Porta server
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = ":8080"
+		port = "8080"
 	}
-	fmt.Printf("Server running on %s\n", port)
-	r.Run(port)
+
+	log.Printf("Server running on :%s\n", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal(err)
+	}
 }
