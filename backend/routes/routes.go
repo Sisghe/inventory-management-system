@@ -17,15 +17,22 @@ import (
 // Register registra tutte le rotte dell'app su Gin.
 func Register(r *gin.Engine) {
 	// ====== Dependency wiring (DI manuale) ======
+
+	// repositories
 	userRepo := repositories.NewUserRepository()
+	productRepo := repositories.NewProductRepository()
+	productTypeRepo := repositories.NewProductTypeRepository()
 
-	// auth
+	// services
 	authService := services.NewAuthService(userRepo)
-	authHandler := handlers.NewAuthHandler(authService)
-
-	// users CRUD
 	userService := services.NewUserService(userRepo)
+	productService := services.NewProductService(productRepo, productTypeRepo)
+
+	// handlers
+	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService)
+	productHandler := handlers.NewProductHandler(productService)
+	productTypeHandler := handlers.NewProductTypeHandler(productTypeRepo)
 
 	// ====== Rotte pubbliche (accessibili senza token) ======
 	r.GET("/ping", func(c *gin.Context) {
@@ -87,9 +94,18 @@ func Register(r *gin.Engine) {
 		api.PUT("/users/:id", userHandler.Update)
 		api.DELETE("/users/:id", userHandler.Delete)
 
-		// Placeholder: prodotti (li implementeremo dopo)
-		api.GET("/products", func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})
-		})
+		// ====================================================
+		// ====== 🔽 NUOVE ROTTE AGGIUNTE (PRODOTTI) 🔽 ======
+		// ====================================================
+
+		// Tipi prodotto (Buste, Carta, Toner)
+		// Usata dal frontend per dropdown / select
+		api.GET("/product-types", productTypeHandler.List)
+
+		// CRUD prodotti
+		api.GET("/products", productHandler.List)
+		api.POST("/products", productHandler.Create)
+		api.PUT("/products/:id", productHandler.Update)
+		api.DELETE("/products/:id", productHandler.Delete)
 	}
 }
