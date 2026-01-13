@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/sisghe/inventory-management-system/backend/db"
+	"github.com/sisghe/inventory-management-system/backend/routes"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	}
 	defer db.Pool.Close()
 
-	// ✅ Verifica reale connessione DB con Ping (pgxpool)
+	// Verifica reale connessione DB con Ping (pgxpool)
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
@@ -35,39 +35,13 @@ func main() {
 		}
 	}
 
-	log.Println("✅ Connected to database successfully (pgxpool ping OK)!")
+	log.Println(" Connected to database successfully (pgxpool ping OK)!")
 
 	// Server Gin
 	r := gin.Default()
 
-	// Healthcheck base
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-			"status":  "server up",
-		})
-	})
-
-	// Healthcheck DB (fa query vera)
-	r.GET("/db-ping", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-		defer cancel()
-
-		var one int
-		err := db.Pool.QueryRow(ctx, "SELECT 1").Scan(&one)
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"db":    "down",
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"db":     "up",
-			"select": one,
-		})
-	})
+	// Registra tutte le rotte (pubbliche + protette)
+	routes.Register(r)
 
 	// Porta server
 	port := os.Getenv("SERVER_PORT")
