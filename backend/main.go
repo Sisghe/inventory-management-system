@@ -9,11 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	"github.com/gin-contrib/cors"
 	"github.com/sisghe/inventory-management-system/backend/db"
 	"github.com/sisghe/inventory-management-system/backend/routes"
 )
 
 func main() {
+
 	// Carica variabili d'ambiente
 	if err := godotenv.Load("../.env"); err != nil {
 		log.Println("No .env file found (continuo comunque usando env di sistema)")
@@ -40,6 +42,12 @@ func main() {
 	// Server Gin
 	r := gin.Default()
 
+	r.Use(cors.New(cors.Config{
+    AllowOrigins:     []string{"http://localhost:3000"},
+    AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+    AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+    AllowCredentials: true,
+	}))
 	// Registra tutte le rotte (pubbliche + protette)
 	routes.Register(r)
 

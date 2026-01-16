@@ -94,10 +94,6 @@ func Register(r *gin.Engine) {
 		api.PUT("/users/:id", userHandler.Update)
 		api.DELETE("/users/:id", userHandler.Delete)
 
-		// ====================================================
-		// ====== 🔽 NUOVE ROTTE AGGIUNTE (PRODOTTI) 🔽 ======
-		// ====================================================
-
 		// Tipi prodotto (Buste, Carta, Toner)
 		// Usata dal frontend per dropdown / select
 		api.GET("/product-types", productTypeHandler.List)
