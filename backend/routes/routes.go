@@ -65,6 +65,9 @@ func Register(r *gin.Engine) {
 		// login reale
 		auth.POST("/login", authHandler.Login)
 
+		// ✅ logout: invalida cookie access_token (non richiede token)
+		auth.POST("/logout", authHandler.Logout)
+
 		// Placeholder: recupero password
 		auth.POST("/forgot-password", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})

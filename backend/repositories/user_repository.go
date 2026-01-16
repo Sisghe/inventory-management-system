@@ -97,7 +97,7 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 	}
 	if nome != nil {
 		set = append(set, "nome = $"+itoa(i))
-		args = append(args, nome) // pointer ok (NULL se nil, ma qui non nil)
+		args = append(args, nome) 
 		i++
 	}
 	if cognome != nil {
@@ -112,7 +112,7 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 	}
 
 	if len(set) == 0 {
-		return r.GetByID(ctx, id) // niente da aggiornare
+		return r.GetByID(ctx, id) 
 	}
 
 	args = append(args, id)

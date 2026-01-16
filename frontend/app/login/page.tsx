@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken } from "@/lib/api";
+import { api } from "@/lib/api";
 
 function validatePasswordAgID(pw: string): string | null {
   if (pw.length < 8) return "La password deve essere lunga almeno 8 caratteri.";
   if (!/[A-Z]/.test(pw)) return "La password deve contenere almeno una lettera maiuscola.";
-  if (!/[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|`~]/.test(pw))
+  if (!/[!@#$%^&*()_\-+=\[\]{};:'\",.<>/?\\|`~]/.test(pw))
     return "La password deve contenere almeno un carattere speciale.";
   return null;
 }
@@ -43,9 +43,12 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      const res = await api.login(username, password);
-      setToken(res.access_token);
+
+      // ✅ Il backend imposta il cookie HttpOnly access_token.
+      await api.login(username, password);
+
       router.push("/dashboard");
+      router.refresh();
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
@@ -91,6 +94,13 @@ export default function LoginPage() {
         <button className="btn btn-primary" type="submit" disabled={loading}>
           {loading ? "Accesso..." : "Accedi"}
         </button>
+
+        <div className="mt-3">
+          {/* Placeholder: lo implementiamo dopo (forgot/reset) */}
+          <a className="link-primary" href="#" onClick={(e) => e.preventDefault()}>
+            Recupera password
+          </a>
+        </div>
       </form>
     </main>
   );

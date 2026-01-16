@@ -1,2 +1,31 @@
+# ===== Secrets / env =====
 .env
-struttura.txt
+.env.*
+!.env.example
+
+# ===== OS / Editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ===== Logs =====
+*.log
+
+# ===== Go build artifacts =====
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# ===== Go vendor (se non lo usi) =====
+/vendor/
+
+# ===== Temporary =====
+tmp/
+temp/
+
+struttura_backend.txt
+struttura_frontend_custom.txt

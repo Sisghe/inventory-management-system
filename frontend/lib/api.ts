@@ -17,27 +17,24 @@ export type UserDTO = {
 type RequestOptions = {
   method?: string;
   body?: unknown;
-  auth?: boolean;
+  auth?: boolean; // lasciato per compatibilità, ma con cookie HttpOnly non serve più
 };
 
-// ===== Token helpers =====
+// ===== Token helpers (DEPRECATED) =====
+// Con strategia best practice (cookie HttpOnly), il token NON va in localStorage.
+// Il cookie viene settato dal backend su /auth/login e inviato automaticamente dal browser.
+// Tengo le funzioni per non rompere il codice esistente: le renderemo inutilizzate quando aggiorniamo /login.
+
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  return null;
 }
 
-export function setToken(token: string) {
-  // LocalStorage (per fetch client-side)
-  localStorage.setItem("access_token", token);
-
-  // Cookie (per middleware Next.js che NON vede localStorage)
-  // Nota: non possiamo impostare HttpOnly da JS (si può solo lato server).
-  document.cookie = `access_token=${encodeURIComponent(token)}; path=/; samesite=lax`;
+export function setToken(_token: string) {
+  // no-op: il backend imposta il cookie HttpOnly
 }
 
 export function clearToken() {
-  localStorage.removeItem("access_token");
-  document.cookie = "access_token=; Max-Age=0; path=/; samesite=lax";
+  // no-op: con HttpOnly il cookie si invalida tramite /auth/logout
 }
 
 // ===== Internal helpers =====
@@ -57,25 +54,32 @@ function getErrorMessage(data: unknown, fallback: string) {
 
 // ===== HTTP client =====
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, auth = true } = opts;
+  const { method = "GET", body } = opts;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
+    credentials: "include", // ✅ fondamentale per cookie cross-origin
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  const isJson = res.headers.get("content-type")?.includes("application/json");
-  const data: unknown = isJson ? await res.json() : null;
+  // Gestione 204 No Content
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+
+  let data: unknown = null;
+  if (isJson) {
+    data = await res.json().catch(() => null);
+  } else {
+    data = await res.text().catch(() => null);
+  }
 
   if (!res.ok) {
     throw new Error(getErrorMessage(data, `HTTP ${res.status}`));
@@ -93,13 +97,21 @@ export const api = {
       auth: false,
     }),
 
+  logout: () =>
+    request<void>("/auth/logout", {
+      method: "POST",
+      auth: false,
+    }),
+
   me: () => request<MeResponse>("/api/me"),
 
   users: {
     list: () => request<UserDTO[]>("/api/users"),
-    create: (payload: UserDTO) => request<UserDTO>("/api/users", { method: "POST", body: payload }),
+    create: (payload: UserDTO) =>
+      request<UserDTO>("/api/users", { method: "POST", body: payload }),
     update: (id: number, payload: UserDTO) =>
       request<UserDTO>(`/api/users/${id}`, { method: "PUT", body: payload }),
-    delete: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+    delete: (id: number) =>
+      request<void>(`/api/users/${id}`, { method: "DELETE" }),
   },
 };

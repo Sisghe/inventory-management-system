@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"github.com/gin-contrib/cors"
 	"github.com/sisghe/inventory-management-system/backend/db"
 	"github.com/sisghe/inventory-management-system/backend/routes"
 )
@@ -37,21 +37,31 @@ func main() {
 		}
 	}
 
-	log.Println(" Connected to database successfully (pgxpool ping OK)!")
+	log.Println("Connected to database successfully (pgxpool ping OK)!")
 
 	// Server Gin
 	r := gin.Default()
 
+	// CORS: necessario per cookie + fetch credentials: 'include'
 	r.Use(cors.New(cors.Config{
-    AllowOrigins:     []string{"http://localhost:3000"},
-    AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-    AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-    AllowCredentials: true,
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"http://127.0.0.1:3000",
+		},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Authorization",
+			"Accept",
+		},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}))
+
 	// Registra tutte le rotte (pubbliche + protette)
 	routes.Register(r)
 
-	// Porta server
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
 		port = "8080"
