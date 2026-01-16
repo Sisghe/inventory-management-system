@@ -14,6 +14,19 @@ export type UserDTO = {
   data_nascita?: string; // ISO date string (es. "1990-01-01")
 };
 
+export type ProductTypeDTO = {
+  id: number;
+  tipo: string;
+};
+
+export type ProductDTO = {
+  id?: number;
+  nome_oggetto: string;
+  descrizione?: string | null;
+  data_inserimento?: string; // ISO string dal backend
+  tipo_prodotto_id?: number | null;
+};
+
 type RequestOptions = {
   method?: string;
   body?: unknown;
@@ -21,20 +34,14 @@ type RequestOptions = {
 };
 
 // ===== Token helpers (DEPRECATED) =====
-// Con strategia best practice (cookie HttpOnly), il token NON va in localStorage.
-// Il cookie viene settato dal backend su /auth/login e inviato automaticamente dal browser.
-// Tengo le funzioni per non rompere il codice esistente: le renderemo inutilizzate quando aggiorniamo /login.
-
 export function getToken(): string | null {
   return null;
 }
-
 export function setToken(_token: string) {
-  // no-op: il backend imposta il cookie HttpOnly
+  // no-op
 }
-
 export function clearToken() {
-  // no-op: con HttpOnly il cookie si invalida tramite /auth/logout
+  // no-op
 }
 
 // ===== Internal helpers =====
@@ -62,11 +69,10 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    credentials: "include", // ✅ fondamentale per cookie cross-origin
+    credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  // Gestione 204 No Content
   if (res.status === 204) {
     return undefined as T;
   }
@@ -75,11 +81,8 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const isJson = contentType.includes("application/json");
 
   let data: unknown = null;
-  if (isJson) {
-    data = await res.json().catch(() => null);
-  } else {
-    data = await res.text().catch(() => null);
-  }
+  if (isJson) data = await res.json().catch(() => null);
+  else data = await res.text().catch(() => null);
 
   if (!res.ok) {
     throw new Error(getErrorMessage(data, `HTTP ${res.status}`));
@@ -107,11 +110,21 @@ export const api = {
 
   users: {
     list: () => request<UserDTO[]>("/api/users"),
-    create: (payload: UserDTO) =>
-      request<UserDTO>("/api/users", { method: "POST", body: payload }),
+    create: (payload: UserDTO) => request<UserDTO>("/api/users", { method: "POST", body: payload }),
     update: (id: number, payload: UserDTO) =>
       request<UserDTO>(`/api/users/${id}`, { method: "PUT", body: payload }),
-    delete: (id: number) =>
-      request<void>(`/api/users/${id}`, { method: "DELETE" }),
+    delete: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+  },
+
+  productTypes: {
+    list: () => request<ProductTypeDTO[]>("/api/product-types"),
+  },
+
+  products: {
+    list: () => request<ProductDTO[]>("/api/products"),
+    create: (payload: ProductDTO) => request<ProductDTO>("/api/products", { method: "POST", body: payload }),
+    update: (id: number, payload: ProductDTO) =>
+      request<ProductDTO>(`/api/products/${id}`, { method: "PUT", body: payload }),
+    delete: (id: number) => request<void>(`/api/products/${id}`, { method: "DELETE" }),
   },
 };
