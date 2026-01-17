@@ -22,10 +22,10 @@ func NewUserRepository() *UserRepository { return &UserRepository{} }
 func (r *UserRepository) FindByUsername(ctx context.Context, username string) (*models.User, error) {
 	u := &models.User{}
 	err := db.Pool.QueryRow(ctx, `
-		SELECT id, username, password_hash, nome, cognome, data_nascita
+		SELECT id, username, password_hash, nome, cognome, data_nascita, email_verified_at
 		FROM utente
 		WHERE username = $1
-	`, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Nome, &u.Cognome, &u.DataNascita)
+	`, username).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Nome, &u.Cognome, &u.DataNascita, &u.EmailVerifiedAt)
 
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (r *UserRepository) FindByUsername(ctx context.Context, username string) (*
 // List restituisce tutti gli utenti (senza password_hash in JSON).
 func (r *UserRepository) List(ctx context.Context) ([]models.User, error) {
 	rows, err := db.Pool.Query(ctx, `
-		SELECT id, username, nome, cognome, data_nascita
+		SELECT id, username, nome, cognome, data_nascita, email_verified_at
 		FROM utente
 		ORDER BY id
 	`)
@@ -48,7 +48,7 @@ func (r *UserRepository) List(ctx context.Context) ([]models.User, error) {
 	out := make([]models.User, 0)
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Nome, &u.Cognome, &u.DataNascita); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Nome, &u.Cognome, &u.DataNascita, &u.EmailVerifiedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -61,12 +61,12 @@ var ErrUsernameTaken = errors.New("username already exists")
 func (r *UserRepository) Create(ctx context.Context, u *models.User) (*models.User, error) {
 	created := &models.User{}
 	err := db.Pool.QueryRow(ctx, `
-		INSERT INTO utente (username, password_hash, nome, cognome, data_nascita)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, username, nome, cognome, data_nascita
+		INSERT INTO utente (username, password_hash, nome, cognome, data_nascita, email_verified_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, username, nome, cognome, data_nascita, email_verified_at
 	`,
-		u.Username, u.PasswordHash, u.Nome, u.Cognome, u.DataNascita,
-	).Scan(&created.ID, &created.Username, &created.Nome, &created.Cognome, &created.DataNascita)
+		u.Username, u.PasswordHash, u.Nome, u.Cognome, u.DataNascita, u.EmailVerifiedAt,
+	).Scan(&created.ID, &created.Username, &created.Nome, &created.Cognome, &created.DataNascita, &created.EmailVerifiedAt)
 
 	if err != nil {
 		// unique violation
@@ -79,7 +79,7 @@ func (r *UserRepository) Create(ctx context.Context, u *models.User) (*models.Us
 	return created, nil
 }
 
-// Update aggiorna campi selezionati (dinamico). Se PasswordHash è vuoto, non lo aggiorna.
+// Update aggiorna campi selezionati (dinamico).
 func (r *UserRepository) Update(ctx context.Context, id int, username *string, passwordHash *string, nome *string, cognome *string, dataNascita *time.Time) (*models.User, error) {
 	set := make([]string, 0)
 	args := make([]any, 0)
@@ -97,7 +97,7 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 	}
 	if nome != nil {
 		set = append(set, "nome = $"+itoa(i))
-		args = append(args, nome) 
+		args = append(args, nome)
 		i++
 	}
 	if cognome != nil {
@@ -112,7 +112,7 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 	}
 
 	if len(set) == 0 {
-		return r.GetByID(ctx, id) 
+		return r.GetByID(ctx, id)
 	}
 
 	args = append(args, id)
@@ -120,11 +120,11 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 		UPDATE utente
 		SET ` + strings.Join(set, ", ") + `
 		WHERE id = $` + itoa(i) + `
-		RETURNING id, username, nome, cognome, data_nascita
+		RETURNING id, username, nome, cognome, data_nascita, email_verified_at
 	`
 
 	updated := &models.User{}
-	err := db.Pool.QueryRow(ctx, q, args...).Scan(&updated.ID, &updated.Username, &updated.Nome, &updated.Cognome, &updated.DataNascita)
+	err := db.Pool.QueryRow(ctx, q, args...).Scan(&updated.ID, &updated.Username, &updated.Nome, &updated.Cognome, &updated.DataNascita, &updated.EmailVerifiedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -138,10 +138,26 @@ func (r *UserRepository) Update(ctx context.Context, id int, username *string, p
 func (r *UserRepository) GetByID(ctx context.Context, id int) (*models.User, error) {
 	u := &models.User{}
 	err := db.Pool.QueryRow(ctx, `
-		SELECT id, username, nome, cognome, data_nascita
+		SELECT id, username, nome, cognome, data_nascita, email_verified_at
 		FROM utente
 		WHERE id = $1
-	`, id).Scan(&u.ID, &u.Username, &u.Nome, &u.Cognome, &u.DataNascita)
+	`, id).Scan(&u.ID, &u.Username, &u.Nome, &u.Cognome, &u.DataNascita, &u.EmailVerifiedAt)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// MarkEmailVerified imposta email_verified_at = NOW() se non già impostata.
+func (r *UserRepository) MarkEmailVerified(ctx context.Context, userID int) (*models.User, error) {
+	u := &models.User{}
+	err := db.Pool.QueryRow(ctx, `
+		UPDATE utente
+		SET email_verified_at = COALESCE(email_verified_at, NOW())
+		WHERE id = $1
+		RETURNING id, username, nome, cognome, data_nascita, email_verified_at
+	`, userID).Scan(&u.ID, &u.Username, &u.Nome, &u.Cognome, &u.DataNascita, &u.EmailVerifiedAt)
+
 	if err != nil {
 		return nil, err
 	}

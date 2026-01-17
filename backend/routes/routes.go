@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/sisghe/inventory-management-system/backend/middleware"
 	"github.com/sisghe/inventory-management-system/backend/repositories"
 	"github.com/sisghe/inventory-management-system/backend/services"
+	"github.com/sisghe/inventory-management-system/backend/utils"
 )
 
 // Register registra tutte le rotte dell'app su Gin.
@@ -22,15 +24,32 @@ func Register(r *gin.Engine) {
 	userRepo := repositories.NewUserRepository()
 	productRepo := repositories.NewProductRepository()
 	productTypeRepo := repositories.NewProductTypeRepository()
+	emailVerRepo := repositories.NewEmailVerificationRepository()
+
+	// mailer (SMTP / Mailtrap)
+	mailer, err := utils.NewSMTPMailerFromEnv()
+	if err != nil {
+		// in dev puoi anche decidere di fatal, ma così almeno il backend parte
+		// e ti segnala che la verifica email non potrà inviare mail finché non setti env.
+		log.Println("SMTP mailer not configured:", err)
+		mailer = nil
+	}
 
 	// services
 	authService := services.NewAuthService(userRepo)
 	userService := services.NewUserService(userRepo)
 	productService := services.NewProductService(productRepo, productTypeRepo)
 
+	var emailVerifyService *services.EmailVerificationService
+	if mailer != nil {
+		emailVerifyService = services.NewEmailVerificationService(emailVerRepo, userRepo, mailer)
+	} else {
+		emailVerifyService = nil
+	}
+
 	// handlers
-	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService)
+	authHandler := handlers.NewAuthHandler(authService, emailVerifyService)
+	userHandler := handlers.NewUserHandler(userService, emailVerifyService)
 	productHandler := handlers.NewProductHandler(productService)
 	productTypeHandler := handlers.NewProductTypeHandler(productTypeRepo)
 
@@ -62,11 +81,11 @@ func Register(r *gin.Engine) {
 	// ====== Gruppo /auth (pubblico) ======
 	auth := r.Group("/auth")
 	{
-		// login reale
 		auth.POST("/login", authHandler.Login)
-
-		// ✅ logout: invalida cookie access_token (non richiede token)
 		auth.POST("/logout", authHandler.Logout)
+
+		// ✅ verifica email
+		auth.POST("/verify-email", authHandler.VerifyEmail)
 
 		// Placeholder: recupero password
 		auth.POST("/forgot-password", func(c *gin.Context) {
@@ -83,7 +102,6 @@ func Register(r *gin.Engine) {
 	api := r.Group("/api")
 	api.Use(middleware.AuthRequired())
 	{
-		// endpoint test: verifica token + middleware
 		api.GET("/me", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"user_id":  c.GetInt("user_id"),
@@ -97,8 +115,7 @@ func Register(r *gin.Engine) {
 		api.PUT("/users/:id", userHandler.Update)
 		api.DELETE("/users/:id", userHandler.Delete)
 
-		// Tipi prodotto (Buste, Carta, Toner)
-		// Usata dal frontend per dropdown / select
+		// Tipi prodotto
 		api.GET("/product-types", productTypeHandler.List)
 
 		// CRUD prodotti

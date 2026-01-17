@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -31,9 +32,18 @@ func (s *UserService) List(ctx context.Context) ([]models.User, error) {
 }
 
 func (s *UserService) Create(ctx context.Context, username, password string, nome, cognome *string, dataNascita *time.Time) (*models.User, error) {
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+
 	if username == "" || password == "" {
 		return nil, ErrBadInput
 	}
+
+	// ✅ username deve essere una email valida
+	if err := utils.ValidateEmail(username); err != nil {
+		return nil, err
+	}
+
 	if err := utils.ValidatePasswordAgID(password); err != nil {
 		return nil, err
 	}
@@ -62,15 +72,29 @@ func (s *UserService) Create(ctx context.Context, username, password string, nom
 }
 
 func (s *UserService) Update(ctx context.Context, id int, username *string, password *string, nome, cognome *string, dataNascita *time.Time) (*models.User, error) {
-	var passwordHash *string
-	if password != nil {
-		if *password == "" {
+	// ✅ se aggiorni username, deve restare una email valida
+	if username != nil {
+		u := strings.TrimSpace(*username)
+		if u == "" {
 			return nil, ErrBadInput
 		}
-		if err := utils.ValidatePasswordAgID(*password); err != nil {
+		if err := utils.ValidateEmail(u); err != nil {
 			return nil, err
 		}
-		h, err := utils.HashPassword(*password)
+		// ri-assegno la versione trimmed
+		*username = u
+	}
+
+	var passwordHash *string
+	if password != nil {
+		p := strings.TrimSpace(*password)
+		if p == "" {
+			return nil, ErrBadInput
+		}
+		if err := utils.ValidatePasswordAgID(p); err != nil {
+			return nil, err
+		}
+		h, err := utils.HashPassword(p)
 		if err != nil {
 			return nil, err
 		}

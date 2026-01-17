@@ -6,15 +6,17 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sisghe/inventory-management-system/backend/repositories"
 	"github.com/sisghe/inventory-management-system/backend/services"
 )
 
 type AuthHandler struct {
-	auth *services.AuthService
+	auth        *services.AuthService
+	emailVerify *services.EmailVerificationService
 }
 
-func NewAuthHandler(auth *services.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+func NewAuthHandler(auth *services.AuthService, emailVerify *services.EmailVerificationService) *AuthHandler {
+	return &AuthHandler{auth: auth, emailVerify: emailVerify}
 }
 
 type loginRequest struct {
@@ -29,7 +31,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// trim per evitare username/password con soli spazi
 	req.Username = strings.TrimSpace(req.Username)
 	req.Password = strings.TrimSpace(req.Password)
 
@@ -40,36 +41,65 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	token, err := h.auth.Login(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
-		if err == services.ErrInvalidCredentials {
+		switch err {
+		case services.ErrInvalidCredentials:
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		case services.ErrEmailNotVerified:
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "email not verified. check your inbox to verify your account",
+			})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+			return
+		}
+	}
+
+	secure := os.Getenv("COOKIE_SECURE") == "true"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("access_token", token, 60*60, "/", "", secure, true)
+
+	c.JSON(http.StatusOK, gin.H{"access_token": token})
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	secure := os.Getenv("COOKIE_SECURE") == "true"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("access_token", "", -1, "/", "", secure, true)
+	c.Status(http.StatusNoContent)
+}
+
+type verifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	if h.emailVerify == nil {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "email verification not configured"})
+		return
+	}
+
+	var req verifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+
+	req.Token = strings.TrimSpace(req.Token)
+	if req.Token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
+		return
+	}
+
+	if err := h.emailVerify.Verify(c.Request.Context(), req.Token); err != nil {
+		if err == repositories.ErrInvalidVerificationToken {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
-	//  Set cookie HttpOnly (utile per middleware.ts di Next, che non legge localStorage)
-	// In dev: COOKIE_SECURE=false (http). In prod: true (https).
-	secure := os.Getenv("COOKIE_SECURE") == "true"
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(
-		"access_token",
-		token,
-		60*60, // 1 ora (allinea al TTL del JWT se è 1h)
-		"/",
-		"",
-		secure,
-		true, // HttpOnly
-	)
-
-	// Manteniamo anche la risposta JSON per compatibilità
-	c.JSON(http.StatusOK, gin.H{"access_token": token})
-}
-
-//  Logout: invalida il cookie (necessario se il token è HttpOnly)
-func (h *AuthHandler) Logout(c *gin.Context) {
-	secure := os.Getenv("COOKIE_SECURE") == "true"
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("access_token", "", -1, "/", "", secure, true)
 	c.Status(http.StatusNoContent)
 }

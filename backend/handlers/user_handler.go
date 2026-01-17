@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,11 +12,12 @@ import (
 )
 
 type UserHandler struct {
-	users *services.UserService
+	users       *services.UserService
+	emailVerify *services.EmailVerificationService
 }
 
-func NewUserHandler(users *services.UserService) *UserHandler {
-	return &UserHandler{users: users}
+func NewUserHandler(users *services.UserService, emailVerify *services.EmailVerificationService) *UserHandler {
+	return &UserHandler{users: users, emailVerify: emailVerify}
 }
 
 func (h *UserHandler) List(c *gin.Context) {
@@ -60,9 +62,21 @@ func (h *UserHandler) Create(c *gin.Context) {
 		case services.ErrUserExists:
 			c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
 		default:
-			// include anche errore password AgID
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
+		return
+	}
+
+	if h.emailVerify == nil {
+		_ = h.users.Delete(c.Request.Context(), created.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "email verification not configured"})
+		return
+	}
+
+	if err := h.emailVerify.Send(c.Request.Context(), created.ID, created.Username); err != nil {
+		log.Println("failed to send verification email:", err) // ✅ log utile
+		_ = h.users.Delete(c.Request.Context(), created.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification email"})
 		return
 	}
 
@@ -93,7 +107,6 @@ func (h *UserHandler) Update(c *gin.Context) {
 	var dn *time.Time
 	if req.DataNascita != nil {
 		if *req.DataNascita == "" {
-			// se vuoi permettere "svuota data" → gestiamolo dopo
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data_nascita cannot be empty; omit field to keep unchanged"})
 			return
 		}

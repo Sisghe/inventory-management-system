@@ -28,6 +28,11 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 		return "", ErrInvalidCredentials
 	}
 
+	// ✅ blocco: non può proseguire finché non verifica l'email
+	if u.EmailVerifiedAt == nil {
+		return "", ErrEmailNotVerified // <-- usa quello definito altrove nel package services
+	}
+
 	token, err := utils.GenerateToken(u.ID, u.Username)
 	if err != nil {
 		return "", err
