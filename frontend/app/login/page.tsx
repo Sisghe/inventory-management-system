@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 
 function validatePasswordAgID(pw: string): string | null {
@@ -86,9 +87,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
-          <div className="form-text">
-            Min 8 caratteri, 1 maiuscola, 1 carattere speciale.
-          </div>
+          <div className="form-text">Min 8 caratteri, 1 maiuscola, 1 carattere speciale.</div>
         </div>
 
         <button className="btn btn-primary" type="submit" disabled={loading}>
@@ -96,10 +95,9 @@ export default function LoginPage() {
         </button>
 
         <div className="mt-3">
-          {/* Placeholder: lo implementiamo dopo (forgot/reset) */}
-          <a className="link-primary" href="#" onClick={(e) => e.preventDefault()}>
+          <Link className="link-primary" href="/forgot-password">
             Recupera password
-          </a>
+          </Link>
         </div>
       </form>
     </main>

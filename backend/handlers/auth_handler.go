@@ -11,12 +11,17 @@ import (
 )
 
 type AuthHandler struct {
-	auth        *services.AuthService
-	emailVerify *services.EmailVerificationService
+	auth          *services.AuthService
+	emailVerify   *services.EmailVerificationService
+	passwordReset *services.PasswordResetService
 }
 
-func NewAuthHandler(auth *services.AuthService, emailVerify *services.EmailVerificationService) *AuthHandler {
-	return &AuthHandler{auth: auth, emailVerify: emailVerify}
+func NewAuthHandler(
+	auth *services.AuthService,
+	emailVerify *services.EmailVerificationService,
+	passwordReset *services.PasswordResetService,
+) *AuthHandler {
+	return &AuthHandler{auth: auth, emailVerify: emailVerify, passwordReset: passwordReset}
 }
 
 type loginRequest struct {
@@ -99,6 +104,76 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+type forgotPasswordRequest struct {
+	Username string `json:"username"` // è l'email
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	if h.passwordReset == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "password reset not configured"})
+		return
+	}
+
+	var req forgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username is required"})
+		return
+	}
+
+	// non riveliamo se esiste o no
+	_ = h.passwordReset.Request(c.Request.Context(), req.Username)
+	c.Status(http.StatusNoContent)
+}
+
+type resetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	if h.passwordReset == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "password reset not configured"})
+		return
+	}
+
+	var req resetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+
+	req.Token = strings.TrimSpace(req.Token)
+	req.Password = strings.TrimSpace(req.Password)
+
+	if req.Token == "" || req.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token and password are required"})
+		return
+	}
+
+	if err := h.passwordReset.Reset(c.Request.Context(), req.Token, req.Password); err != nil {
+		switch err {
+		case repositories.ErrInvalidResetToken:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+			return
+		case services.ErrPasswordSameAsOld:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new password must be different from previous"})
+			return
+		default:
+			// include errori AgID
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	c.Status(http.StatusNoContent)

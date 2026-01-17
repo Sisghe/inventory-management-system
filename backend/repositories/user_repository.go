@@ -175,4 +175,31 @@ func (r *UserRepository) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
+// ====== Reset password helpers ======
+
+func (r *UserRepository) GetPasswordHashByID(ctx context.Context, id int) (string, error) {
+	var hash string
+	err := db.Pool.QueryRow(ctx, `
+		SELECT password_hash
+		FROM public.utente
+		WHERE id = $1
+	`, id).Scan(&hash)
+	return hash, err
+}
+
+func (r *UserRepository) UpdatePasswordHash(ctx context.Context, id int, newHash string) error {
+	ct, err := db.Pool.Exec(ctx, `
+		UPDATE public.utente
+		SET password_hash = $1
+		WHERE id = $2
+	`, newHash, id)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func itoa(n int) string { return strconv.Itoa(n) }

@@ -25,12 +25,11 @@ func Register(r *gin.Engine) {
 	productRepo := repositories.NewProductRepository()
 	productTypeRepo := repositories.NewProductTypeRepository()
 	emailVerRepo := repositories.NewEmailVerificationRepository()
+	passwordResetRepo := repositories.NewPasswordResetRepository()
 
 	// mailer (SMTP / Mailtrap)
 	mailer, err := utils.NewSMTPMailerFromEnv()
 	if err != nil {
-		// in dev puoi anche decidere di fatal, ma così almeno il backend parte
-		// e ti segnala che la verifica email non potrà inviare mail finché non setti env.
 		log.Println("SMTP mailer not configured:", err)
 		mailer = nil
 	}
@@ -47,8 +46,15 @@ func Register(r *gin.Engine) {
 		emailVerifyService = nil
 	}
 
+	var passwordResetService *services.PasswordResetService
+	if mailer != nil {
+		passwordResetService = services.NewPasswordResetService(passwordResetRepo, userRepo, mailer)
+	} else {
+		passwordResetService = nil
+	}
+
 	// handlers
-	authHandler := handlers.NewAuthHandler(authService, emailVerifyService)
+	authHandler := handlers.NewAuthHandler(authService, emailVerifyService, passwordResetService)
 	userHandler := handlers.NewUserHandler(userService, emailVerifyService)
 	productHandler := handlers.NewProductHandler(productService)
 	productTypeHandler := handlers.NewProductTypeHandler(productTypeRepo)
@@ -87,15 +93,11 @@ func Register(r *gin.Engine) {
 		// ✅ verifica email
 		auth.POST("/verify-email", authHandler.VerifyEmail)
 
-		// Placeholder: recupero password
-		auth.POST("/forgot-password", func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})
-		})
+		// ✅ recupero password
+		auth.POST("/forgot-password", authHandler.ForgotPassword)
 
-		// Placeholder: reset password
-		auth.POST("/reset-password", func(c *gin.Context) {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})
-		})
+		// ✅ reset password
+		auth.POST("/reset-password", authHandler.ResetPassword)
 	}
 
 	// ====== Rotte protette (richiedono token) ======
