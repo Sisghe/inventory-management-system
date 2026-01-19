@@ -1,40 +1,38 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+/* eslint-disable @next/next/no-css-tags */
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Inventory Management System",
   description: "Erasmus project – Next.js + Bootstrap Italia",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it">
       <head>
-        {/* Bootstrap Italia CSS servito come asset statico */}
-        <link
-          rel="stylesheet"
-          href="/vendor/bootstrap-italia/bootstrap-italia.min.css"
-        />
+        <link rel="stylesheet" href="/vendor/bootstrap-italia/bootstrap-italia.min.css" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
+
+        {/* JS Bootstrap Italia: necessario per navbar mobile, dropdown, modal, ecc. */}
+        <Script
+          src="/vendor/bootstrap-italia/bootstrap-italia.bundle.min.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

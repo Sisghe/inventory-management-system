@@ -82,14 +82,19 @@ export default function InventoryPage() {
       return;
     }
 
+    // nel tuo backend: tipo_prodotto_id è obbligatorio
+    if (!cTipoId) {
+      setError("Il campo Tipo prodotto è obbligatorio.");
+      return;
+    }
+
     const payload: ProductDTO = {
       nome_oggetto: nome,
+      tipo_prodotto_id: Number(cTipoId),
     };
 
     const desc = cDescrizione.trim();
     if (desc) payload.descrizione = desc;
-
-    if (cTipoId) payload.tipo_prodotto_id = Number(cTipoId);
 
     try {
       setLoading(true);
@@ -139,10 +144,15 @@ export default function InventoryPage() {
       return;
     }
 
+    if (!edit.tipo_prodotto_id) {
+      setError("Il campo Tipo prodotto è obbligatorio.");
+      return;
+    }
+
     const payload: ProductDTO = {
       nome_oggetto: nome,
       descrizione: edit.descrizione.trim() ? edit.descrizione.trim() : null,
-      tipo_prodotto_id: edit.tipo_prodotto_id ? Number(edit.tipo_prodotto_id) : null,
+      tipo_prodotto_id: Number(edit.tipo_prodotto_id),
     };
 
     try {
@@ -184,10 +194,17 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="container-fluid p-0">
-      <div className="d-flex align-items-center justify-content-between mb-3">
+    <div className="p-0">
+      {/* Header responsive */}
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
         <h1 className="h4 mb-0">Gestione inventario</h1>
-        <button className="btn btn-outline-primary" onClick={loadAll} disabled={loading} type="button">
+
+        <button
+          className="btn btn-outline-primary align-self-start align-self-sm-auto"
+          onClick={loadAll}
+          disabled={loading}
+          type="button"
+        >
           {loading ? "Caricamento..." : "Ricarica"}
         </button>
       </div>
@@ -210,13 +227,13 @@ export default function InventoryPage() {
 
           <form onSubmit={onCreate}>
             <div className="row g-3">
-              <div className="col-md-4">
+              <div className="col-12 col-md-4">
                 <label className="form-label">Nome oggetto *</label>
                 <input className="form-control" value={cNome} onChange={(e) => setCNome(e.target.value)} />
               </div>
 
-              <div className="col-md-4">
-                <label className="form-label">Tipo prodotto</label>
+              <div className="col-12 col-md-4">
+                <label className="form-label">Tipo prodotto *</label>
                 <select className="form-select" value={cTipoId} onChange={(e) => setCTipoId(e.target.value)}>
                   <option value="">Seleziona…</option>
                   {types.map((t) => (
@@ -228,7 +245,7 @@ export default function InventoryPage() {
                 <div className="form-text">Tipi ammessi: Buste, Carta, Toner.</div>
               </div>
 
-              <div className="col-md-4">
+              <div className="col-12 col-md-4">
                 <label className="form-label">Descrizione</label>
                 <input
                   className="form-control"
@@ -247,7 +264,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Products table */}
+      {/* Elenco prodotti */}
       <div className="card">
         <div className="card-body">
           <h2 className="h6 mb-3">Elenco prodotti</h2>
@@ -255,43 +272,115 @@ export default function InventoryPage() {
           {sortedProducts.length === 0 ? (
             <p className="mb-0">Nessun prodotto trovato.</p>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 80 }}>ID</th>
-                    <th>Nome oggetto</th>
-                    <th>Tipo</th>
-                    <th>Descrizione</th>
-                    <th style={{ width: 140 }}>Data inserimento</th>
-                    <th style={{ width: 200 }}>Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedProducts.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.id}</td>
-                      <td>{p.nome_oggetto}</td>
-                      <td>
-                        {p.tipo_prodotto_id != null ? typeMap.get(p.tipo_prodotto_id) ?? `ID ${p.tipo_prodotto_id}` : ""}
-                      </td>
-                      <td>{(p.descrizione ?? "") as string}</td>
-                      <td>{isoToDate(p.data_inserimento)}</td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <button className="btn btn-sm btn-outline-primary" type="button" onClick={() => openEdit(p)}>
-                            Modifica
-                          </button>
-                          <button className="btn btn-sm btn-outline-danger" type="button" onClick={() => onDelete(p)}>
-                            Elimina
-                          </button>
+            <>
+              {/* ✅ DESKTOP/TABLET */}
+              <div className="d-none d-md-block">
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 80 }}>ID</th>
+                        <th>Nome oggetto</th>
+                        <th>Tipo</th>
+                        <th>Descrizione</th>
+                        <th style={{ width: 140 }}>Data inserimento</th>
+                        <th style={{ width: 220 }}>Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedProducts.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.id}</td>
+                          <td className="text-break">{p.nome_oggetto}</td>
+                          <td>
+                            {p.tipo_prodotto_id != null
+                              ? typeMap.get(p.tipo_prodotto_id) ?? `ID ${p.tipo_prodotto_id}`
+                              : "—"}
+                          </td>
+                          <td className="text-break">{((p.descrizione ?? "") as string) || "—"}</td>
+                          <td>{isoToDate(p.data_inserimento) || "—"}</td>
+                          <td>
+                            <div className="d-flex flex-wrap gap-2">
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                type="button"
+                                onClick={() => openEdit(p)}
+                              >
+                                Modifica
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                type="button"
+                                onClick={() => onDelete(p)}
+                              >
+                                Elimina
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ✅ MOBILE: cards */}
+              <div className="d-md-none">
+                <div className="d-flex flex-column gap-3">
+                  {sortedProducts.map((p) => {
+                    const tipoLabel =
+                      p.tipo_prodotto_id != null
+                        ? typeMap.get(p.tipo_prodotto_id) ?? `ID ${p.tipo_prodotto_id}`
+                        : "—";
+
+                    return (
+                      <div className="card" key={p.id}>
+                        <div className="card-body">
+                          <div className="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div className="small text-muted">ID</div>
+                              <div className="fw-semibold">{p.id}</div>
+                            </div>
+                            <div className="text-end">
+                              <div className="small text-muted">Data inserimento</div>
+                              <div className="fw-semibold">{isoToDate(p.data_inserimento) || "—"}</div>
+                            </div>
+                          </div>
+
+                          <hr className="my-3" />
+
+                          <div className="mb-2">
+                            <div className="small text-muted">Nome oggetto</div>
+                            <div className="text-break fw-semibold">{p.nome_oggetto}</div>
+                          </div>
+
+                          <div className="row g-2">
+                            <div className="col-12">
+                              <div className="small text-muted">Tipo</div>
+                              <div>{tipoLabel}</div>
+                            </div>
+
+                            <div className="col-12">
+                              <div className="small text-muted">Descrizione</div>
+                              <div className="text-break">{((p.descrizione ?? "") as string) || "—"}</div>
+                            </div>
+                          </div>
+
+                          <div className="d-grid gap-2 mt-3">
+                            <button className="btn btn-outline-primary" type="button" onClick={() => openEdit(p)}>
+                              Modifica
+                            </button>
+                            <button className="btn btn-outline-danger" type="button" onClick={() => onDelete(p)}>
+                              Elimina
+                            </button>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -306,7 +395,11 @@ export default function InventoryPage() {
           style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={closeEdit}
         >
-          <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-dialog modal-fullscreen-sm-down"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-content">
               <div className="modal-header">
                 <h3 className="modal-title h6 mb-0">Modifica prodotto</h3>
@@ -325,7 +418,7 @@ export default function InventoryPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label">Tipo prodotto</label>
+                    <label className="form-label">Tipo prodotto *</label>
                     <select
                       className="form-select"
                       value={edit.tipo_prodotto_id}

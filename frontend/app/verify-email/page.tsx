@@ -25,6 +25,8 @@ export default function VerifyEmailPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
 
+  const tokenMissing = !token;
+
   useEffect(() => {
     async function run() {
       if (!token) {
@@ -59,8 +61,8 @@ export default function VerifyEmailPage() {
         }
 
         let backendMsg = `HTTP ${res.status}`;
-        if (isObject(data) && typeof data.error === "string") {
-          backendMsg = data.error;
+        if (isObject(data) && typeof data["error"] === "string") {
+          backendMsg = data["error"] as string;
         }
 
         setStatus("error");
@@ -75,41 +77,61 @@ export default function VerifyEmailPage() {
   }, [token]);
 
   return (
-    <main className="container py-5" style={{ maxWidth: 720 }}>
-      <h1 className="mb-4">Verifica Email</h1>
+    <main className="container py-4 py-md-5">
+      <div className="row justify-content-center">
+        <div className="col-12 col-sm-10 col-md-8 col-lg-6">
+          <h1 className="h3 mb-3 mb-md-4 text-center">Verifica Email</h1>
 
-      {status === "loading" && (
-        <div className="alert alert-info" role="alert">
-          Verifica in corso...
+          {tokenMissing && (
+            <div className="alert alert-danger" role="alert">
+              Token mancante. Apri il link ricevuto via email.
+            </div>
+          )}
+
+          {status === "loading" && (
+            <div className="alert alert-info" role="alert">
+              Verifica in corso...
+            </div>
+          )}
+
+          {status === "success" && (
+            <div className="alert alert-success" role="alert">
+              {message}
+            </div>
+          )}
+
+          {status === "error" && (
+            <div className="alert alert-danger" role="alert">
+              {message || "Verifica fallita. Il token potrebbe essere scaduto o non valido."}
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-body">
+              <div className="d-grid d-sm-flex gap-2">
+                <Link className="btn btn-primary" href="/login">
+                  Vai al login
+                </Link>
+                <Link className="btn btn-outline-primary" href="/">
+                  Home
+                </Link>
+              </div>
+
+              <div className="mt-3">
+                <small className="text-muted">
+                  Se il link è scaduto, richiedi una nuova email di verifica (funzione che aggiungeremo nello step
+                  “Recupera password / gestione email”).
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-3">
+            <Link className="link-primary" href="/">
+              Home
+            </Link>
+          </div>
         </div>
-      )}
-
-      {status === "success" && (
-        <div className="alert alert-success" role="alert">
-          {message}
-        </div>
-      )}
-
-      {status === "error" && (
-        <div className="alert alert-danger" role="alert">
-          {message || "Verifica fallita. Il token potrebbe essere scaduto o non valido."}
-        </div>
-      )}
-
-      <div className="d-flex gap-2 mt-4">
-        <Link className="btn btn-primary" href="/login">
-          Vai al login
-        </Link>
-        <Link className="btn btn-outline-primary" href="/">
-          Home
-        </Link>
-      </div>
-
-      <div className="mt-4">
-        <small className="text-muted">
-          Se il link è scaduto, richiedi una nuova email di verifica (funzione che aggiungeremo nello
-          step “Recupera password / gestione email”).
-        </small>
       </div>
     </main>
   );

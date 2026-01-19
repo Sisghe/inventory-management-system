@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -39,11 +40,27 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
+	req.NomeOggetto = strings.TrimSpace(req.NomeOggetto)
+
+	// validazioni base (handler)
+	if req.NomeOggetto == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nome_oggetto is required"})
+		return
+	}
+	if req.TipoProdottoID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id is required"})
+		return
+	}
+	if *req.TipoProdottoID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id must be > 0"})
+		return
+	}
+
 	created, err := h.products.Create(c.Request.Context(), req.NomeOggetto, req.Descrizione, req.TipoProdottoID)
 	if err != nil {
 		switch err {
 		case services.ErrProductBadInput:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "nome_oggetto is required"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "bad input"})
 		case services.ErrInvalidProductType:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id is invalid"})
 		default:
@@ -68,11 +85,26 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 
+	req.NomeOggetto = strings.TrimSpace(req.NomeOggetto)
+
+	if req.NomeOggetto == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nome_oggetto is required"})
+		return
+	}
+	if req.TipoProdottoID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id is required"})
+		return
+	}
+	if *req.TipoProdottoID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id must be > 0"})
+		return
+	}
+
 	updated, err := h.products.Update(c.Request.Context(), id, req.NomeOggetto, req.Descrizione, req.TipoProdottoID)
 	if err != nil {
 		switch err {
 		case services.ErrProductBadInput:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "nome_oggetto is required"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "bad input"})
 		case services.ErrInvalidProductType:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "tipo_prodotto_id is invalid"})
 		case services.ErrProductNotFound:

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -14,6 +15,11 @@ var (
 	ErrProductBadInput    = errors.New("bad input")
 	ErrProductNotFound    = errors.New("not found")
 	ErrInvalidProductType = errors.New("invalid product type")
+)
+
+const (
+	maxNomeOggettoLen = 200
+	maxDescrizioneLen = 1000
 )
 
 type ProductService struct {
@@ -30,13 +36,26 @@ func (s *ProductService) List(ctx context.Context) ([]models.Product, error) {
 }
 
 func (s *ProductService) Create(ctx context.Context, nome string, descrizione *string, tipoID *int) (*models.Product, error) {
+	nome = strings.TrimSpace(nome)
 	if nome == "" {
 		return nil, ErrProductBadInput
 	}
-	// tipoID può essere nil (DB lo permette), ma nel progetto lo vogliamo obbligatorio:
-	if tipoID == nil {
+	if len(nome) > maxNomeOggettoLen {
+		return nil, ErrProductBadInput
+	}
+
+	// nel progetto lo vogliamo obbligatorio
+	if tipoID == nil || *tipoID <= 0 {
 		return nil, ErrInvalidProductType
 	}
+
+	// sanitize descrizione
+	desc := sanitizeOptionalString(descrizione, maxDescrizioneLen)
+	if descrizione != nil && desc == nil {
+		// descrizione presente ma invalida (troppo lunga)
+		return nil, ErrProductBadInput
+	}
+
 	ok, err := s.types.ExistsByID(ctx, *tipoID)
 	if err != nil {
 		return nil, err
@@ -47,7 +66,7 @@ func (s *ProductService) Create(ctx context.Context, nome string, descrizione *s
 
 	p := &models.Product{
 		NomeOggetto:    nome,
-		Descrizione:    descrizione,
+		Descrizione:    desc,
 		TipoProdottoID: tipoID,
 	}
 
@@ -62,12 +81,23 @@ func (s *ProductService) Create(ctx context.Context, nome string, descrizione *s
 }
 
 func (s *ProductService) Update(ctx context.Context, id int, nome string, descrizione *string, tipoID *int) (*models.Product, error) {
+	nome = strings.TrimSpace(nome)
 	if id <= 0 || nome == "" {
 		return nil, ErrProductBadInput
 	}
-	if tipoID == nil {
+	if len(nome) > maxNomeOggettoLen {
+		return nil, ErrProductBadInput
+	}
+
+	if tipoID == nil || *tipoID <= 0 {
 		return nil, ErrInvalidProductType
 	}
+
+	desc := sanitizeOptionalString(descrizione, maxDescrizioneLen)
+	if descrizione != nil && desc == nil {
+		return nil, ErrProductBadInput
+	}
+
 	ok, err := s.types.ExistsByID(ctx, *tipoID)
 	if err != nil {
 		return nil, err
@@ -76,7 +106,7 @@ func (s *ProductService) Update(ctx context.Context, id int, nome string, descri
 		return nil, ErrInvalidProductType
 	}
 
-	updated, err := s.products.Update(ctx, id, nome, descrizione, tipoID)
+	updated, err := s.products.Update(ctx, id, nome, desc, tipoID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrProductNotFound
@@ -98,4 +128,19 @@ func (s *ProductService) Delete(ctx context.Context, id int) error {
 		return ErrProductNotFound
 	}
 	return err
+}
+
+
+func sanitizeOptionalString(in *string, max int) *string {
+	if in == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*in)
+	if s == "" {
+		return nil
+	}
+	if len(s) > max {
+		return nil
+	}
+	return &s
 }

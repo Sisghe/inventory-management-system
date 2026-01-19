@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 export default function DashboardNavbar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Chiude il menu quando cambi route (utile su mobile)
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   async function onLogout() {
     try {
@@ -16,29 +24,88 @@ export default function DashboardNavbar() {
     }
   }
 
+  const isUsers = pathname?.startsWith("/dashboard/users");
+  const isInventory = pathname?.startsWith("/dashboard/inventory");
+
   return (
     <header className="it-header-wrapper">
       <div className="it-nav-wrapper">
-        <div className="it-header-navbar-wrapper">
-          <div className="container">
-            <div className="d-flex align-items-center justify-content-between py-2">
-              <Link className="navbar-brand mb-0" href="/dashboard">
+        <div className="it-header-navbar-wrapper theme-dark">
+          <div className="container-xxl">
+            {/* bg-primary => contrasto garantito, link non “spariscono” */}
+            <nav
+              className="navbar navbar-expand-lg navbar-dark bg-primary py-2"
+              aria-label="Navigazione dashboard"
+            >
+              <Link className="navbar-brand text-white" href="/dashboard">
                 Inventory
               </Link>
 
-              <div className="d-flex align-items-center gap-3">
-                <Link className="nav-link" href="/dashboard/users">
-                  Utenti
-                </Link>
-                <Link className="nav-link" href="/dashboard/inventory">
-                  Inventario
-                </Link>
+              <button
+                className="navbar-toggler border border-white ms-auto"
+                type="button"
+                aria-controls="dashboardNav"
+                aria-expanded={open}
+                aria-label="Mostra/Nascondi menu"
+                onClick={() => setOpen((v) => !v)}
+              >
+                <span className="navbar-toggler-icon" />
+              </button>
 
-                <button className="btn btn-outline-light" onClick={onLogout} type="button">
-                  Logout
-                </button>
+              {/* ✅ Toggle “hard” su mobile: evita link invisibili ma cliccabili */}
+              <div
+                id="dashboardNav"
+                className={[
+                  "navbar-collapse",
+                  open ? "d-block" : "d-none",
+                  "d-lg-flex",
+                  "align-items-lg-center",
+                  "ms-lg-auto",
+                  "mt-3 mt-lg-0",
+                ].join(" ")}
+              >
+                <ul className="navbar-nav ms-lg-auto mb-3 mb-lg-0">
+                  <li className="nav-item">
+                    <Link
+                      className={`nav-link text-white ${
+                        isUsers ? "active fw-semibold" : ""
+                      }`}
+                      href="/dashboard/users"
+                      onClick={() => setOpen(false)}
+                      aria-current={isUsers ? "page" : undefined}
+                    >
+                      Utenti
+                    </Link>
+                  </li>
+
+                  <li className="nav-item">
+                    <Link
+                      className={`nav-link text-white ${
+                        isInventory ? "active fw-semibold" : ""
+                      }`}
+                      href="/dashboard/inventory"
+                      onClick={() => setOpen(false)}
+                      aria-current={isInventory ? "page" : undefined}
+                    >
+                      Inventario
+                    </Link>
+                  </li>
+                </ul>
+
+                <div className="d-grid d-lg-block ms-lg-3">
+                  <button
+                    className="btn btn-outline-light"
+                    onClick={() => {
+                      setOpen(false);
+                      void onLogout();
+                    }}
+                    type="button"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
-            </div>
+            </nav>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/sisghe/inventory-management-system/backend/repositories"
 	"github.com/sisghe/inventory-management-system/backend/utils"
@@ -19,6 +20,19 @@ func NewAuthService(users *repositories.UserRepository) *AuthService {
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password string) (string, error) {
+	// normalizzazione
+	username = strings.ToLower(strings.TrimSpace(username))
+	password = strings.TrimSpace(password)
+
+	if username == "" || password == "" {
+		return "", ErrInvalidCredentials
+	}
+
+	// username deve essere email (ma non vogliamo leakare dettagli in login)
+	if err := utils.ValidateEmail(username); err != nil {
+		return "", ErrInvalidCredentials
+	}
+
 	u, err := s.users.FindByUsername(ctx, username)
 	if err != nil {
 		return "", ErrInvalidCredentials
@@ -28,9 +42,9 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 		return "", ErrInvalidCredentials
 	}
 
-	// ✅ blocco: non può proseguire finché non verifica l'email
+	// blocco login finché non verifica email
 	if u.EmailVerifiedAt == nil {
-		return "", ErrEmailNotVerified // <-- usa quello definito altrove nel package services
+		return "", ErrEmailNotVerified
 	}
 
 	token, err := utils.GenerateToken(u.ID, u.Username)

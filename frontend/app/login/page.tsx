@@ -31,12 +31,15 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    if (!username || !password) {
+    const u = username.trim();
+    const p = password.trim();
+
+    if (!u || !p) {
       setError("Username e password sono obbligatori.");
       return;
     }
 
-    const pwErr = validatePasswordAgID(password);
+    const pwErr = validatePasswordAgID(p);
     if (pwErr) {
       setError(pwErr);
       return;
@@ -45,8 +48,8 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
-      // ✅ Il backend imposta il cookie HttpOnly access_token.
-      await api.login(username, password);
+      // Il backend imposta il cookie HttpOnly access_token.
+      await api.login(u, p);
 
       router.push("/dashboard");
       router.refresh();
@@ -58,48 +61,67 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="container py-5" style={{ maxWidth: 520 }}>
-      <h1 className="mb-4">Login</h1>
+    <main className="container py-4 py-md-5">
+      <div className="row justify-content-center">
+        <div className="col-12 col-sm-10 col-md-7 col-lg-5">
+          <h1 className="h3 mb-3 mb-md-4 text-center">Login</h1>
 
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
+          {error && (
+            <div className="alert alert-danger" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-body">
+              <form onSubmit={onSubmit}>
+                <div className="mb-3">
+                  <label className="form-label">Username</label>
+                  <input
+                    className="form-control"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                    inputMode="email"
+                    placeholder="es. nome.cognome@email.it"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Password</label>
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    placeholder="Inserisci la tua password"
+                  />
+                  <div className="form-text">
+                    Min 8 caratteri, 1 maiuscola, 1 carattere speciale.
+                  </div>
+                </div>
+
+                <div className="d-grid d-sm-flex gap-2">
+                  <button className="btn btn-primary" type="submit" disabled={loading}>
+                    {loading ? "Accesso..." : "Accedi"}
+                  </button>
+
+                  <Link className="btn btn-outline-primary" href="/forgot-password">
+                    Recupera password
+                  </Link>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="text-center mt-3">
+            <Link className="link-primary" href="/">
+              Torna alla Home
+            </Link>
+          </div>
         </div>
-      )}
-
-      <form onSubmit={onSubmit}>
-        <div className="mb-3">
-          <label className="form-label">Username</label>
-          <input
-            className="form-control"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-          />
-        </div>
-
-        <div className="mb-3">
-          <label className="form-label">Password</label>
-          <input
-            className="form-control"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-          <div className="form-text">Min 8 caratteri, 1 maiuscola, 1 carattere speciale.</div>
-        </div>
-
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Accesso..." : "Accedi"}
-        </button>
-
-        <div className="mt-3">
-          <Link className="link-primary" href="/forgot-password">
-            Recupera password
-          </Link>
-        </div>
-      </form>
+      </div>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"net/http"
 	"os"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sisghe/inventory-management-system/backend/repositories"
 	"github.com/sisghe/inventory-management-system/backend/services"
+	"github.com/sisghe/inventory-management-system/backend/utils"
 )
 
 type AuthHandler struct {
@@ -36,7 +38,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 	req.Password = strings.TrimSpace(req.Password)
 
 	if req.Username == "" || req.Password == "" {
@@ -51,9 +53,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		case services.ErrEmailNotVerified:
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "email not verified. check your inbox to verify your account",
-			})
+			c.JSON(http.StatusForbidden, gin.H{"error": "email not verified. check your inbox to verify your account"})
 			return
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
@@ -73,6 +73,14 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("access_token", "", -1, "/", "", secure, true)
 	c.Status(http.StatusNoContent)
+}
+
+func isValidHexToken(token string, expectedLen int) bool {
+	if len(token) != expectedLen {
+		return false
+	}
+	_, err := hex.DecodeString(token)
+	return err == nil
 }
 
 type verifyEmailRequest struct {
@@ -96,6 +104,10 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
 		return
 	}
+	if !isValidHexToken(req.Token, 64) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+		return
+	}
 
 	if err := h.emailVerify.Verify(c.Request.Context(), req.Token); err != nil {
 		if err == repositories.ErrInvalidVerificationToken {
@@ -110,7 +122,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 }
 
 type forgotPasswordRequest struct {
-	Username string `json:"username"` // è l'email
+	Username string `json:"username"` // email
 }
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
@@ -125,13 +137,19 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 	if req.Username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "username is required"})
 		return
 	}
 
-	// non riveliamo se esiste o no
+	// qui ha senso essere espliciti: username deve essere email valida
+	if err := utils.ValidateEmail(req.Username); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// anti-enumeration: rispondiamo 204 comunque
 	_ = h.passwordReset.Request(c.Request.Context(), req.Username)
 	c.Status(http.StatusNoContent)
 }
@@ -158,6 +176,15 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 	if req.Token == "" || req.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "token and password are required"})
+		return
+	}
+	if !isValidHexToken(req.Token, 64) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+		return
+	}
+	// bcrypt considera solo i primi 72 caratteri: meglio bloccare oltre
+	if len(req.Password) > 72 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password too long (max 72 characters)"})
 		return
 	}
 

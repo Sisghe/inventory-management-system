@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sisghe/inventory-management-system/backend/repositories"
@@ -45,11 +46,16 @@ func NewPasswordResetService(repo *repositories.PasswordResetRepository, users *
 	}
 }
 
-// Request: invia email con link reset (se utente esiste). Risponde OK anche se non esiste (anti-enumeration).
 func (s *PasswordResetService) Request(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	// se per qualche motivo arrivasse qui email non valida, non facciamo nulla (anti-enumeration)
+	if err := utils.ValidateEmail(email); err != nil {
+		return nil
+	}
+
 	u, err := s.users.FindByUsername(ctx, email)
 	if err != nil {
-		// non riveliamo se l'utente esiste o no
 		return nil
 	}
 
@@ -75,6 +81,16 @@ func (s *PasswordResetService) Request(ctx context.Context, email string) error 
 }
 
 func (s *PasswordResetService) Reset(ctx context.Context, token string, newPassword string) error {
+	token = strings.TrimSpace(token)
+	newPassword = strings.TrimSpace(newPassword)
+
+	if token == "" || newPassword == "" {
+		return errors.New("token and password are required")
+	}
+	if len(newPassword) > 72 {
+		return errors.New("password too long (max 72 characters)")
+	}
+
 	tokenHash := utils.HashToken(token)
 
 	userID, err := s.repo.Consume(ctx, tokenHash)
@@ -87,12 +103,11 @@ func (s *PasswordResetService) Reset(ctx context.Context, token string, newPassw
 		return err
 	}
 
-	// nuova password deve essere diversa dalla precedente
 	if utils.CheckPassword(newPassword, oldHash) {
 		return ErrPasswordSameAsOld
 	}
 
-	// regole AgID
+	// regole AgID (specifica)
 	if err := utils.ValidatePasswordAgID(newPassword); err != nil {
 		return err
 	}

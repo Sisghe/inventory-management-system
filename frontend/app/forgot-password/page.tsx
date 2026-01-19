@@ -50,7 +50,6 @@ export default function ForgotPasswordPage() {
 
       // backend: 204 se ok (anche se utente non esiste)
       if (!res.ok && res.status !== 204) {
-        // prova a leggere errore json
         const contentType = res.headers.get("content-type") || "";
         if (contentType.includes("application/json")) {
           const data: unknown = await res.json().catch(() => null);
@@ -66,9 +65,7 @@ export default function ForgotPasswordPage() {
         throw new Error(`HTTP ${res.status}`);
       }
 
-      setSuccess(
-        "Se l’email è registrata, riceverai a breve un messaggio con il link per reimpostare la password."
-      );
+      setSuccess("Se l’email è registrata, riceverai a breve un messaggio con il link per reimpostare la password.");
       setUsername("");
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -78,43 +75,63 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="container py-5" style={{ maxWidth: 620 }}>
-      <h1 className="mb-4">Recupera password</h1>
+    <main className="container py-4 py-md-5">
+      <div className="row justify-content-center">
+        <div className="col-12 col-sm-10 col-md-8 col-lg-6">
+          <h1 className="h3 mb-3 mb-md-4 text-center">Recupera password</h1>
 
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
+          {error && (
+            <div className="alert alert-danger" role="alert">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="alert alert-success" role="alert">
+              {success}
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-body">
+              <p className="text-muted mb-3">
+                Inserisci l’email con cui ti sei registrato. Se risulta presente a sistema, ti invieremo un link per
+                reimpostare la password.
+              </p>
+
+              <form onSubmit={onSubmit}>
+                <div className="mb-3">
+                  <label className="form-label">Email (username)</label>
+                  <input
+                    className="form-control"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="nome@dominio.it"
+                  />
+                </div>
+
+                <div className="d-grid d-sm-flex gap-2">
+                  <button className="btn btn-primary" type="submit" disabled={loading}>
+                    {loading ? "Invio..." : "Invia link di recupero"}
+                  </button>
+
+                  <Link className="btn btn-outline-primary" href="/login">
+                    Torna al login
+                  </Link>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="text-center mt-3">
+            <Link className="link-primary" href="/">
+              Home
+            </Link>
+          </div>
         </div>
-      )}
-
-      {success && (
-        <div className="alert alert-success" role="alert">
-          {success}
-        </div>
-      )}
-
-      <form onSubmit={onSubmit}>
-        <div className="mb-3">
-          <label className="form-label">Email (username)</label>
-          <input
-            className="form-control"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="email"
-            placeholder="nome@dominio.it"
-          />
-        </div>
-
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Invio..." : "Invia link di recupero"}
-        </button>
-
-        <div className="mt-3">
-          <Link className="link-primary" href="/login">
-            Torna al login
-          </Link>
-        </div>
-      </form>
+      </div>
     </main>
   );
 }

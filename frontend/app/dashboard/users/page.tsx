@@ -37,6 +37,11 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // ✅ errore specifico del modal (modifica utente)
+  const [editError, setEditError] = useState<string | null>(null);
+  // ✅ attiva la validazione visuale dopo il primo "Salva"
+  const [editTriedSubmit, setEditTriedSubmit] = useState(false);
+
   // Form create
   const [cUsername, setCUsername] = useState("");
   const [cPassword, setCPassword] = useState("");
@@ -124,6 +129,9 @@ export default function UsersPage() {
     setError(null);
     setSuccess(null);
 
+    setEditError(null);
+    setEditTriedSubmit(false);
+
     setEdit({
       open: true,
       userId: u.id ?? null,
@@ -136,22 +144,26 @@ export default function UsersPage() {
   }
 
   function closeEdit() {
+    setEditError(null);
+    setEditTriedSubmit(false);
     setEdit((s) => ({ ...s, open: false, userId: null }));
   }
 
   async function onUpdate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+
+    setEditTriedSubmit(true);
+    setEditError(null);
     setSuccess(null);
 
     if (!edit.userId) {
-      setError("ID utente non valido.");
+      setEditError("ID utente non valido.");
       return;
     }
 
     const username = edit.username.trim();
     if (!username) {
-      setError("Lo username non può essere vuoto.");
+      setEditError("Lo username non può essere vuoto.");
       return;
     }
 
@@ -159,17 +171,18 @@ export default function UsersPage() {
     if (password) {
       const pwErr = validatePasswordAgID(password);
       if (pwErr) {
-        setError(pwErr);
+        setEditError(pwErr);
         return;
       }
     }
 
     const payload: UserDTO = { username };
     if (password) payload.password = password;
+
     payload.nome = edit.nome.trim() || undefined;
     payload.cognome = edit.cognome.trim() || undefined;
 
-    // IMPORTANT: il tuo backend rifiuta data_nascita vuota: se vuota NON inviarla
+    // backend: se data_nascita vuota NON inviarla
     if (edit.data_nascita.trim()) payload.data_nascita = edit.data_nascita.trim();
 
     try {
@@ -178,8 +191,8 @@ export default function UsersPage() {
       setSuccess("Utente aggiornato correttamente.");
       closeEdit();
       await loadUsers();
-    } catch (e) {
-      setError(getErrMsg(e));
+    } catch (e2) {
+      setEditError(getErrMsg(e2));
     } finally {
       setLoading(false);
     }
@@ -210,11 +223,22 @@ export default function UsersPage() {
     }
   }
 
+  // ✅ calcolo errore password (solo se l’utente ha scritto qualcosa)
+  const editPasswordTrimmed = edit.password.trim();
+  const editPasswordErr =
+    editPasswordTrimmed.length > 0 ? validatePasswordAgID(editPasswordTrimmed) : null;
+
   return (
     <div className="container-fluid p-0">
-      <div className="d-flex align-items-center justify-content-between mb-3">
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
         <h1 className="h4 mb-0">Gestione utenti</h1>
-        <button className="btn btn-outline-primary" onClick={loadUsers} disabled={loading} type="button">
+
+        <button
+          className="btn btn-outline-primary align-self-start align-self-sm-auto"
+          onClick={loadUsers}
+          disabled={loading}
+          type="button"
+        >
           {loading ? "Caricamento..." : "Ricarica"}
         </button>
       </div>
@@ -234,13 +258,20 @@ export default function UsersPage() {
       <div className="card mb-4">
         <div className="card-body">
           <h2 className="h6 mb-3">Crea nuovo utente</h2>
+
           <form onSubmit={onCreate}>
             <div className="row g-3">
-              <div className="col-md-6">
+              <div className="col-12 col-md-6">
                 <label className="form-label">Username *</label>
-                <input className="form-control" value={cUsername} onChange={(e) => setCUsername(e.target.value)} />
+                <input
+                  className="form-control"
+                  value={cUsername}
+                  onChange={(e) => setCUsername(e.target.value)}
+                  autoComplete="username"
+                />
               </div>
-              <div className="col-md-6">
+
+              <div className="col-12 col-md-6">
                 <label className="form-label">Password *</label>
                 <input
                   className="form-control"
@@ -252,15 +283,17 @@ export default function UsersPage() {
                 <div className="form-text">Min 8 caratteri, 1 maiuscola, 1 carattere speciale.</div>
               </div>
 
-              <div className="col-md-4">
+              <div className="col-12 col-md-4">
                 <label className="form-label">Nome</label>
                 <input className="form-control" value={cNome} onChange={(e) => setCNome(e.target.value)} />
               </div>
-              <div className="col-md-4">
+
+              <div className="col-12 col-md-4">
                 <label className="form-label">Cognome</label>
                 <input className="form-control" value={cCognome} onChange={(e) => setCCognome(e.target.value)} />
               </div>
-              <div className="col-md-4">
+
+              <div className="col-12 col-md-4">
                 <label className="form-label">Data nascita</label>
                 <input
                   className="form-control"
@@ -280,7 +313,7 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Tabella utenti */}
+      {/* Elenco */}
       <div className="card">
         <div className="card-body">
           <h2 className="h6 mb-3">Elenco utenti</h2>
@@ -288,41 +321,93 @@ export default function UsersPage() {
           {sortedUsers.length === 0 ? (
             <p className="mb-0">Nessun utente trovato.</p>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 80 }}>ID</th>
-                    <th>Username</th>
-                    <th>Nome</th>
-                    <th>Cognome</th>
-                    <th style={{ width: 140 }}>Data nascita</th>
-                    <th style={{ width: 200 }}>Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <>
+              <div className="d-none d-md-block">
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 80 }}>ID</th>
+                        <th>Username</th>
+                        <th>Nome</th>
+                        <th>Cognome</th>
+                        <th style={{ width: 140 }}>Data nascita</th>
+                        <th style={{ width: 220 }}>Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedUsers.map((u) => (
+                        <tr key={u.id}>
+                          <td>{u.id}</td>
+                          <td className="text-break">{u.username}</td>
+                          <td>{u.nome ?? ""}</td>
+                          <td>{u.cognome ?? ""}</td>
+                          <td>{normalizeDate(u.data_nascita)}</td>
+                          <td>
+                            <div className="d-flex flex-wrap gap-2">
+                              <button className="btn btn-sm btn-outline-primary" type="button" onClick={() => openEdit(u)}>
+                                Modifica
+                              </button>
+                              <button className="btn btn-sm btn-outline-danger" type="button" onClick={() => onDelete(u)}>
+                                Elimina
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="d-md-none">
+                <div className="d-flex flex-column gap-3">
                   {sortedUsers.map((u) => (
-                    <tr key={u.id}>
-                      <td>{u.id}</td>
-                      <td>{u.username}</td>
-                      <td>{u.nome ?? ""}</td>
-                      <td>{u.cognome ?? ""}</td>
-                      <td>{normalizeDate(u.data_nascita)}</td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <button className="btn btn-sm btn-outline-primary" type="button" onClick={() => openEdit(u)}>
+                    <div className="card" key={u.id}>
+                      <div className="card-body">
+                        <div className="d-flex justify-content-between align-items-start gap-2">
+                          <div>
+                            <div className="small text-muted">ID</div>
+                            <div className="fw-semibold">{u.id}</div>
+                          </div>
+                          <div className="text-end">
+                            <div className="small text-muted">Data nascita</div>
+                            <div className="fw-semibold">{normalizeDate(u.data_nascita) || "—"}</div>
+                          </div>
+                        </div>
+
+                        <hr className="my-3" />
+
+                        <div className="mb-2">
+                          <div className="small text-muted">Username</div>
+                          <div className="text-break fw-semibold">{u.username}</div>
+                        </div>
+
+                        <div className="row g-2">
+                          <div className="col-6">
+                            <div className="small text-muted">Nome</div>
+                            <div>{u.nome ?? "—"}</div>
+                          </div>
+                          <div className="col-6">
+                            <div className="small text-muted">Cognome</div>
+                            <div>{u.cognome ?? "—"}</div>
+                          </div>
+                        </div>
+
+                        <div className="d-grid gap-2 mt-3">
+                          <button className="btn btn-outline-primary" type="button" onClick={() => openEdit(u)}>
                             Modifica
                           </button>
-                          <button className="btn btn-sm btn-outline-danger" type="button" onClick={() => onDelete(u)}>
+                          <button className="btn btn-outline-danger" type="button" onClick={() => onDelete(u)}>
                             Elimina
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -337,7 +422,11 @@ export default function UsersPage() {
           style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={closeEdit}
         >
-          <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-dialog modal-fullscreen-sm-down"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-content">
               <div className="modal-header">
                 <h3 className="modal-title h6 mb-0">Modifica utente</h3>
@@ -346,29 +435,51 @@ export default function UsersPage() {
 
               <form onSubmit={onUpdate}>
                 <div className="modal-body">
+                  {editError && (
+                    <div className="alert alert-danger" role="alert">
+                      {editError}
+                    </div>
+                  )}
+
                   <div className="mb-3">
                     <label className="form-label">Username *</label>
                     <input
                       className="form-control"
                       value={edit.username}
-                      onChange={(e) => setEdit((s) => ({ ...s, username: e.target.value }))}
+                      onChange={(e) => {
+                        setEdit((s) => ({ ...s, username: e.target.value }));
+                        if (editError) setEditError(null);
+                      }}
                     />
                   </div>
 
                   <div className="mb-3">
                     <label className="form-label">Nuova password (opzionale)</label>
                     <input
-                      className="form-control"
+                      className={[
+                        "form-control",
+                        editTriedSubmit && editPasswordErr ? "is-invalid" : "",
+                      ].join(" ")}
                       type="password"
                       value={edit.password}
-                      onChange={(e) => setEdit((s) => ({ ...s, password: e.target.value }))}
+                      onChange={(e) => {
+                        setEdit((s) => ({ ...s, password: e.target.value }));
+                        // se sto correggendo, pulisco l’alert generale
+                        if (editError) setEditError(null);
+                      }}
                       autoComplete="new-password"
                     />
-                    <div className="form-text">Se lasci vuoto, la password non viene modificata.</div>
+
+                    {/* ✅ messaggio sotto al campo */}
+                    {editTriedSubmit && editPasswordErr ? (
+                      <div className="invalid-feedback">{editPasswordErr}</div>
+                    ) : (
+                      <div className="form-text">Se lasci vuoto, la password non viene modificata.</div>
+                    )}
                   </div>
 
                   <div className="row g-3">
-                    <div className="col-md-6">
+                    <div className="col-12 col-md-6">
                       <label className="form-label">Nome</label>
                       <input
                         className="form-control"
@@ -376,7 +487,7 @@ export default function UsersPage() {
                         onChange={(e) => setEdit((s) => ({ ...s, nome: e.target.value }))}
                       />
                     </div>
-                    <div className="col-md-6">
+                    <div className="col-12 col-md-6">
                       <label className="form-label">Cognome</label>
                       <input
                         className="form-control"
@@ -384,7 +495,7 @@ export default function UsersPage() {
                         onChange={(e) => setEdit((s) => ({ ...s, cognome: e.target.value }))}
                       />
                     </div>
-                    <div className="col-md-12">
+                    <div className="col-12">
                       <label className="form-label">Data nascita</label>
                       <input
                         className="form-control"

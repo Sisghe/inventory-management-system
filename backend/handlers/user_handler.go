@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -44,9 +45,12 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	req.Username = strings.TrimSpace(req.Username)
+	req.Password = strings.TrimSpace(req.Password)
+
 	var dn *time.Time
-	if req.DataNascita != nil && *req.DataNascita != "" {
-		t, err := time.Parse("2006-01-02", *req.DataNascita)
+	if req.DataNascita != nil && strings.TrimSpace(*req.DataNascita) != "" {
+		t, err := time.Parse("2006-01-02", strings.TrimSpace(*req.DataNascita))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data_nascita must be YYYY-MM-DD"})
 			return
@@ -62,6 +66,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		case services.ErrUserExists:
 			c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
 		default:
+			// include: email non valida, password AgID, lunghezze, data_nascita invalida...
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
 		return
@@ -74,7 +79,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.emailVerify.Send(c.Request.Context(), created.ID, created.Username); err != nil {
-		log.Println("failed to send verification email:", err) // ✅ log utile
+		log.Println("failed to send verification email:", err)
 		_ = h.users.Delete(c.Request.Context(), created.ID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send verification email"})
 		return
@@ -106,11 +111,12 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 	var dn *time.Time
 	if req.DataNascita != nil {
-		if *req.DataNascita == "" {
+		v := strings.TrimSpace(*req.DataNascita)
+		if v == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data_nascita cannot be empty; omit field to keep unchanged"})
 			return
 		}
-		t, err := time.Parse("2006-01-02", *req.DataNascita)
+		t, err := time.Parse("2006-01-02", v)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data_nascita must be YYYY-MM-DD"})
 			return

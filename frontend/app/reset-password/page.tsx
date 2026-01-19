@@ -31,6 +31,8 @@ export default function ResetPasswordPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
 
+  const tokenMissing = !token;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
@@ -74,20 +76,18 @@ export default function ResetPasswordPage() {
       if (res.status === 204) {
         setStatus("success");
         setMessage("Password aggiornata correttamente! Ora puoi effettuare il login.");
-        // opzionale: dopo 1 secondo vai al login
+
         setTimeout(() => {
           router.push("/login");
           router.refresh();
         }, 1000);
+
         return;
       }
 
-      // errore: prova a leggere JSON
       let data: unknown = null;
       const isJson = res.headers.get("content-type")?.includes("application/json");
-      if (isJson) {
-        data = await res.json().catch(() => null);
-      }
+      if (isJson) data = await res.json().catch(() => null);
 
       let backendMsg = `HTTP ${res.status}`;
       if (isObject(data) && typeof data["error"] === "string") {
@@ -102,78 +102,86 @@ export default function ResetPasswordPage() {
     }
   }
 
-  const tokenMissing = !token;
-
   return (
-    <main className="container py-5" style={{ maxWidth: 620 }}>
-      <h1 className="mb-4">Reimposta password</h1>
+    <main className="container py-4 py-md-5">
+      <div className="row justify-content-center">
+        <div className="col-12 col-sm-10 col-md-8 col-lg-6">
+          <h1 className="h3 mb-3 mb-md-4 text-center">Reimposta password</h1>
 
-      {tokenMissing && (
-        <div className="alert alert-danger" role="alert">
-          Token mancante. Apri il link ricevuto via email.
-        </div>
-      )}
+          {tokenMissing && (
+            <div className="alert alert-danger" role="alert">
+              Token mancante. Apri il link ricevuto via email.
+            </div>
+          )}
 
-      {status === "loading" && (
-        <div className="alert alert-info" role="alert">
-          Salvataggio in corso...
-        </div>
-      )}
+          {status === "loading" && (
+            <div className="alert alert-info" role="alert">
+              Salvataggio in corso...
+            </div>
+          )}
 
-      {status === "success" && (
-        <div className="alert alert-success" role="alert">
-          {message}
-        </div>
-      )}
+          {status === "success" && (
+            <div className="alert alert-success" role="alert">
+              {message}
+            </div>
+          )}
 
-      {status === "error" && message && (
-        <div className="alert alert-danger" role="alert">
-          {message}
-        </div>
-      )}
+          {status === "error" && message && (
+            <div className="alert alert-danger" role="alert">
+              {message}
+            </div>
+          )}
 
-      <form onSubmit={onSubmit}>
-        <div className="mb-3">
-          <label className="form-label">Nuova password</label>
-          <input
-            className="form-control"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            disabled={tokenMissing || status === "loading"}
-          />
-          <div className="form-text">
-            Min 8 caratteri, 1 maiuscola, 1 carattere speciale. Deve essere diversa dalla precedente.
+          <div className="card">
+            <div className="card-body">
+              <form onSubmit={onSubmit}>
+                <div className="mb-3">
+                  <label className="form-label">Nuova password</label>
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={tokenMissing || status === "loading"}
+                  />
+                  <div className="form-text">
+                    Min 8 caratteri, 1 maiuscola, 1 carattere speciale. Deve essere diversa dalla precedente.
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Conferma password</label>
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={tokenMissing || status === "loading"}
+                  />
+                </div>
+
+                <div className="d-grid d-sm-flex gap-2">
+                  <button className="btn btn-primary" type="submit" disabled={tokenMissing || status === "loading"}>
+                    {status === "loading" ? "Salvataggio..." : "Reimposta password"}
+                  </button>
+
+                  <Link className="btn btn-outline-primary" href="/login">
+                    Torna al login
+                  </Link>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="text-center mt-3">
+            <Link className="link-primary" href="/">
+              Home
+            </Link>
           </div>
         </div>
-
-        <div className="mb-3">
-          <label className="form-label">Conferma password</label>
-          <input
-            className="form-control"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            autoComplete="new-password"
-            disabled={tokenMissing || status === "loading"}
-          />
-        </div>
-
-        <button
-          className="btn btn-primary"
-          type="submit"
-          disabled={tokenMissing || status === "loading"}
-        >
-          {status === "loading" ? "Salvataggio..." : "Reimposta password"}
-        </button>
-
-        <div className="mt-3">
-          <Link className="link-primary" href="/login">
-            Torna al login
-          </Link>
-        </div>
-      </form>
+      </div>
     </main>
   );
 }
