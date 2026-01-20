@@ -6,10 +6,12 @@ import (
 	"net"
 	"net/smtp"
 	"os"
+	"strings"
+	"time"
 )
 
 type Mailer interface {
-	Send(to, subject, body string) error
+	Send(to, subject, htmlBody string) error
 }
 
 type SMTPMailer struct {
@@ -34,7 +36,7 @@ func NewSMTPMailerFromEnv() (*SMTPMailer, error) {
 	return m, nil
 }
 
-func (m *SMTPMailer) Send(to, subject, body string) error {
+func (m *SMTPMailer) Send(to, subject, htmlBody string) error {
 	addr := net.JoinHostPort(m.host, m.port)
 
 	c, err := smtp.Dial(addr)
@@ -68,14 +70,31 @@ func (m *SMTPMailer) Send(to, subject, body string) error {
 		return err
 	}
 
+	boundary := "BOUNDARY_" + fmt.Sprint(time.Now().UnixNano())
+
+	plainBody := stripHTML(htmlBody)
+
 	msg := ""
 	msg += fmt.Sprintf("From: %s\r\n", m.from)
 	msg += fmt.Sprintf("To: %s\r\n", to)
 	msg += fmt.Sprintf("Subject: %s\r\n", subject)
 	msg += "MIME-Version: 1.0\r\n"
+	msg += fmt.Sprintf("Content-Type: multipart/alternative; boundary=%s\r\n", boundary)
+	msg += "\r\n"
+
+	// Parte text/plain
+	msg += fmt.Sprintf("--%s\r\n", boundary)
 	msg += "Content-Type: text/plain; charset=utf-8\r\n"
 	msg += "\r\n"
-	msg += body
+	msg += plainBody + "\r\n"
+
+	// Parte text/html
+	msg += fmt.Sprintf("--%s\r\n", boundary)
+	msg += "Content-Type: text/html; charset=utf-8\r\n"
+	msg += "\r\n"
+	msg += htmlBody + "\r\n"
+
+	msg += fmt.Sprintf("--%s--\r\n", boundary)
 
 	if _, err := w.Write([]byte(msg)); err != nil {
 		_ = w.Close()
@@ -86,4 +105,18 @@ func (m *SMTPMailer) Send(to, subject, body string) error {
 	}
 
 	return c.Quit()
+}
+
+// Rimuove HTML in modo semplice per la versione plain text
+func stripHTML(s string) string {
+	replacer := strings.NewReplacer(
+		"<br>", "\n",
+		"<br/>", "\n",
+		"<br />", "\n",
+		"</p>", "\n\n",
+	)
+	out := replacer.Replace(s)
+	out = strings.ReplaceAll(out, "<", "")
+	out = strings.ReplaceAll(out, ">", "")
+	return strings.TrimSpace(out)
 }

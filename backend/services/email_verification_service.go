@@ -59,9 +59,43 @@ func (s *EmailVerificationService) Send(ctx context.Context, userID int, email s
 
 	link := fmt.Sprintf("%s/verify-email?token=%s", s.frontend, url.QueryEscape(token))
 	subject := "Verifica la tua email"
-	body := "Ciao!\n\nPer completare la registrazione, verifica la tua email cliccando qui:\n\n" +
-		link + "\n\n" +
-		"Il link scade tra " + s.ttl.String() + ".\n"
+
+	ttlHuman := utils.HumanizeDurationMinutes(s.ttl)
+
+
+	// Email HTML professionale (link “nascosto” dietro bottone)
+	body := fmt.Sprintf(`
+<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; line-height: 1.5; color:#111;">
+  <h2 style="margin: 0 0 12px;">Verifica la tua email</h2>
+
+  <p style="margin: 0 0 12px;">Ciao,</p>
+  <p style="margin: 0 0 18px;">
+    per completare la registrazione, conferma il tuo indirizzo email cliccando sul pulsante qui sotto.
+  </p>
+
+  <p style="margin: 22px 0;">
+    <a href="%s"
+       style="background:#0B5ED7;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;display:inline-block;">
+      Verifica email
+    </a>
+  </p>
+
+  <p style="margin: 0 0 10px; color:#555; font-size: 13px;">
+    Il link scade tra %s.
+  </p>
+
+  <p style="margin: 18px 0 0; color:#555; font-size: 13px;">
+    Se il pulsante non funziona, copia e incolla questo link nel browser:<br/>
+    <a href="%s" style="color:#0B5ED7;">%s</a>
+  </p>
+
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
+
+  <p style="margin:0; color:#777; font-size: 12px;">
+    Se non hai richiesto questa operazione, puoi ignorare questa email.
+  </p>
+</div>
+`, link, ttlHuman, link, link)
 
 	return s.mailer.Send(email, subject, body)
 }
@@ -74,4 +108,13 @@ func (s *EmailVerificationService) Verify(ctx context.Context, token string) err
 	}
 	_, err = s.usersRepo.MarkEmailVerified(ctx, userID)
 	return err
+}
+
+// humanizeDurationMinutes converte una durata in una stringa semplice e professionale.
+func humanizeDurationMinutes(d time.Duration) string {
+	min := int(d.Round(time.Minute) / time.Minute)
+	if min <= 1 {
+		return "1 minuto"
+	}
+	return fmt.Sprintf("%d minuti", min)
 }

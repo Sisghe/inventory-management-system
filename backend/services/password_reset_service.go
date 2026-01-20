@@ -49,7 +49,7 @@ func NewPasswordResetService(repo *repositories.PasswordResetRepository, users *
 func (s *PasswordResetService) Request(ctx context.Context, email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	// se per qualche motivo arrivasse qui email non valida, non facciamo nulla (anti-enumeration)
+	// anti-enumeration: se email non valida o utente non trovato, non riveliamo nulla
 	if err := utils.ValidateEmail(email); err != nil {
 		return nil
 	}
@@ -72,10 +72,43 @@ func (s *PasswordResetService) Request(ctx context.Context, email string) error 
 
 	link := fmt.Sprintf("%s/reset-password?token=%s", s.frontend, url.QueryEscape(token))
 	subject := "Recupero password"
-	body := "Ciao!\n\nPer reimpostare la password clicca qui:\n\n" +
-		link + "\n\n" +
-		"Il link scade tra " + s.ttl.String() + ".\n" +
-		"Se non hai richiesto tu il reset, ignora questa email.\n"
+
+	ttlHuman := utils.HumanizeDurationMinutes(s.ttl)
+
+
+	// Email HTML professionale (bottone + fallback link)
+	body := fmt.Sprintf(`
+<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; line-height: 1.5; color:#111;">
+  <h2 style="margin: 0 0 12px;">Reimposta la tua password</h2>
+
+  <p style="margin: 0 0 12px;">Ciao,</p>
+  <p style="margin: 0 0 18px;">
+    abbiamo ricevuto una richiesta di reimpostazione della password. Puoi procedere cliccando sul pulsante qui sotto.
+  </p>
+
+  <p style="margin: 22px 0;">
+    <a href="%s"
+       style="background:#0B5ED7;color:#fff;text-decoration:none;padding:12px 18px;border-radius:6px;display:inline-block;">
+      Reimposta password
+    </a>
+  </p>
+
+  <p style="margin: 0 0 10px; color:#555; font-size: 13px;">
+    Il link scade tra %s.
+  </p>
+
+  <p style="margin: 18px 0 0; color:#555; font-size: 13px;">
+    Se il pulsante non funziona, copia e incolla questo link nel browser:<br/>
+    <a href="%s" style="color:#0B5ED7;">%s</a>
+  </p>
+
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
+
+  <p style="margin:0; color:#777; font-size: 12px;">
+    Se non hai richiesto tu il reset della password, puoi ignorare questa email.
+  </p>
+</div>
+`, link, ttlHuman, link, link)
 
 	return s.mailer.Send(email, subject, body)
 }
