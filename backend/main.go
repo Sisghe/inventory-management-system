@@ -15,10 +15,12 @@ import (
 )
 
 func main() {
-
-	// Carica variabili d'ambiente
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("No .env file found (continuo comunque usando env di sistema)")
+	// Carica variabili d'ambiente (non bloccante).
+	// Best practice: prova prima .env nella working dir, poi fallback a ../.env.
+	if err := godotenv.Load(); err != nil {
+		if err2 := godotenv.Load("../.env"); err2 != nil {
+			log.Println("No .env file found (continuo comunque usando env di sistema)")
+		}
 	}
 
 	// Connessione al database (pgxpool)
@@ -33,16 +35,23 @@ func main() {
 		defer cancel()
 
 		if err := db.Pool.Ping(ctx); err != nil {
-			log.Fatal("❌ DB Ping failed:", err)
+			log.Fatal("DB Ping failed:", err)
 		}
 	}
 
 	log.Println("Connected to database successfully (pgxpool ping OK)!")
 
 	// Server Gin
+	// Nota: gin.Default() include già Logger + Recovery
 	r := gin.Default()
 
-	// CORS: necessario per cookie + fetch credentials: 'include'
+	// Best practice: evita warning "You trusted all proxies".
+	// In locale va benissimo nil. In prod potrai impostare IP proxy reali.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Println("SetTrustedProxies warning:", err)
+	}
+
+	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
@@ -62,7 +71,11 @@ func main() {
 	// Registra tutte le rotte (pubbliche + protette)
 	routes.Register(r)
 
-	port := os.Getenv("SERVER_PORT")
+	// Best practice: supporta anche PORT (utile su molte piattaforme), fallback a SERVER_PORT.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = os.Getenv("SERVER_PORT")
+	}
 	if port == "" {
 		port = "8080"
 	}
