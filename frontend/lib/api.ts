@@ -37,7 +37,7 @@ type RequestOptions = {
 export function getToken(): string | null {
   return null;
 }
-export function setToken(_token: string) {
+export function setToken() {
   // no-op
 }
 export function clearToken() {

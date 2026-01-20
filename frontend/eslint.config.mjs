@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Project/vendor ignores:
+    "node_modules/**",
+    "public/vendor/**",
+    "public/**/*.min.*",
   ]),
 ]);
 
