@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -29,7 +29,20 @@ export default function ResetPasswordClient({ token }: { token: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
 
-  const tokenMissing = !token;
+  const tokenMissing = !token || token.trim() === "";
+
+  // Se manca token, impostiamo subito lo stato di errore (così non duplichiamo alert)
+  useEffect(() => {
+    if (tokenMissing) {
+      setStatus("error");
+      setMessage("Token mancante. Apri il link ricevuto via email.");
+    } else if (status === "error" && message.includes("Token mancante")) {
+      // Se arriva un token dopo (raro), resettiamo lo stato
+      setStatus("idle");
+      setMessage("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenMissing]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +80,6 @@ export default function ResetPasswordClient({ token }: { token: string }) {
       const res = await fetch(`${API_BASE}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ token: t, password }),
       });
 
@@ -106,9 +118,9 @@ export default function ResetPasswordClient({ token }: { token: string }) {
         <div className="col-12 col-sm-10 col-md-8 col-lg-6">
           <h1 className="h3 mb-3 mb-md-4 text-center">Reimposta password</h1>
 
-          {tokenMissing && (
-            <div className="alert alert-danger" role="alert">
-              Token mancante. Apri il link ricevuto via email.
+          {status === "idle" && !tokenMissing && (
+            <div className="alert alert-info" role="alert">
+              Inserisci la nuova password.
             </div>
           )}
 
@@ -124,9 +136,9 @@ export default function ResetPasswordClient({ token }: { token: string }) {
             </div>
           )}
 
-          {status === "error" && message && (
+          {status === "error" && (
             <div className="alert alert-danger" role="alert">
-              {message}
+              {message || "Errore. Il token potrebbe essere scaduto o non valido."}
             </div>
           )}
 

@@ -21,7 +21,10 @@ export default function VerifyEmailClient({ token }: { token: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
 
-  const tokenMissing = !token;
+  // DEBUG (se serve): abilita per capire se il token arriva davvero dal link
+  // useEffect(() => {
+  //   console.log("verify-email token:", token);
+  // }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,10 +43,11 @@ export default function VerifyEmailClient({ token }: { token: string }) {
         const res = await fetch(`${API_BASE}/auth/verify-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
+          // credentials: "include", // non necessario per verify via token, puoi lasciarlo commentato
           body: JSON.stringify({ token }),
         });
 
+        // Se backend risponde 204 No Content -> successo
         if (res.status === 204) {
           if (cancelled) return;
           setStatus("success");
@@ -51,6 +55,7 @@ export default function VerifyEmailClient({ token }: { token: string }) {
           return;
         }
 
+        // Altrimenti prova a leggere JSON errore
         let data: unknown = null;
         const contentType = res.headers.get("content-type") || "";
         const isJson = contentType.includes("application/json");
@@ -81,9 +86,9 @@ export default function VerifyEmailClient({ token }: { token: string }) {
         <div className="col-12 col-sm-10 col-md-8 col-lg-6">
           <h1 className="h3 mb-3 mb-md-4 text-center">Verifica Email</h1>
 
-          {tokenMissing && (
-            <div className="alert alert-danger" role="alert">
-              Token mancante. Apri il link ricevuto via email.
+          {status === "idle" && (
+            <div className="alert alert-info" role="alert">
+              Preparazione verifica...
             </div>
           )}
 

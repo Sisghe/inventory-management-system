@@ -1,10 +1,11 @@
 import VerifyEmailClient from "./VerifyEmailClient";
 
 type PageProps = {
-  searchParams: { token?: string };
+  searchParams: Promise<{ token?: string }>;
 };
 
-export default function VerifyEmailPage({ searchParams }: PageProps) {
-  const token = searchParams?.token ?? "";
+export default async function VerifyEmailPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  const token = sp?.token ?? "";
   return <VerifyEmailClient token={token} />;
 }

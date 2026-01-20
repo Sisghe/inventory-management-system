@@ -1,10 +1,11 @@
 import ResetPasswordClient from "./ResetPasswordClient";
 
 type PageProps = {
-  searchParams: { token?: string };
+  searchParams: Promise<{ token?: string }>;
 };
 
-export default function ResetPasswordPage({ searchParams }: PageProps) {
-  const token = searchParams?.token ?? "";
+export default async function ResetPasswordPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  const token = sp?.token ?? "";
   return <ResetPasswordClient token={token} />;
 }
